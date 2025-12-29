@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Convert equation - this should work with proper font initialization
     const node = html.convert(equation, { display: true });
-    let svgContent = adaptor.outerHTML(node);
+    let svgContent = extractSVGFromContainer(adaptor.outerHTML(node));
 
     // Apply dimensions if provided
     if (width || height) {
@@ -124,6 +124,16 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function extractSVGFromContainer(htmlContent: string): string {
+  // Extract SVG element from mjx-container wrapper
+  const svgMatch = htmlContent.match(/<svg[^>]*>[\s\S]*?<\/svg>/i);
+  if (svgMatch) {
+    return svgMatch[0];
+  }
+  // Fallback: return original if no SVG found
+  return htmlContent;
 }
 
 function applyDimensions(

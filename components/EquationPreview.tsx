@@ -71,13 +71,24 @@ export default function EquationPreview({ equation, font = 'TeX' }: EquationPrev
       window.MathJax.typesetPromise([containerRef.current]).catch((err) => {
         console.error('MathJax typeset error:', err);
       });
+    } else if (window.MathJax && containerRef.current && !equation && mathJaxLoadedRef.current) {
+      // Clear the container when equation is empty
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
     }
   }, [equation, font]);
 
   if (!equation.trim()) {
     return (
-      <div className="flex h-full items-center justify-center text-gray-400">
-        <p>Preview will appear here</p>
+      <div className="flex h-full items-center justify-center text-gray-400 bg-gradient-to-br from-gray-50 via-white to-gray-50">
+        <div className="text-center">
+          <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="text-sm font-medium">Preview will appear here</p>
+          <p className="text-xs text-gray-400 mt-1">Start typing an equation to see the preview</p>
+        </div>
       </div>
     );
   }
@@ -85,9 +96,9 @@ export default function EquationPreview({ equation, font = 'TeX' }: EquationPrev
   return (
     <div
       ref={containerRef}
-      className="h-full overflow-auto p-6 bg-gray-50"
+      className="h-full overflow-auto p-8 bg-gradient-to-br from-gray-50 via-white to-gray-50"
     >
-      <div>{equation}</div>
+      <div className="flex items-center justify-center min-h-full py-4">{equation}</div>
     </div>
   );
 }
