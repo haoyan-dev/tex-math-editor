@@ -1,36 +1,214 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LaTeX Math Equation Editor
 
-## Getting Started
+A self-hosted Next.js TypeScript web application for easily editing LaTeX math equations with live preview and server-side image export capabilities. Export equations to SVG format for further editing in vector design tools like Affinity Designer or Inkscape.
 
-First, run the development server:
+## Project Overview
+
+**Purpose**: Self-hosted project for easily editing LaTeX math equations and exporting them to SVG format
+
+**Primary Use Case**: Export equations as SVG for further editing in vector design tools (Affinity Designer, Inkscape)
+
+**Technology Stack**: Next.js, TypeScript, MathJax
+
+**Deployment**: Self-hosted solution with Docker support for easy deployment
+
+## Features
+
+- **Multiple Math Modes**: 
+  - `equation`: Uses `\begin{equation}...\end{equation}` wrapper
+  - `inline`: Uses `\(...\)` delimiters
+  - `display`: Uses `\[...\]` delimiters
+
+- **Interactive Symbol Palette**: Common mathematical symbols and Greek alphabet (both lowercase and uppercase) for click-to-insert functionality
+
+- **Font Selection**: Multiple MathJax output fonts (TeX, STIX, Asana-Math, Latin-Modern, Computer-Modern, Neo-Euler, Gyre-Pagella, Gyre-Termes)
+
+- **Live Preview**: Real-time MathJax rendering as you type
+
+- **Export Options**: 
+  - SVG: Download as file or copy code (element/document format)
+  - PNG: Raster image export
+  - JPG: Raster image export
+
+- **Flexible Dimensions**: 
+  - Auto-size (default)
+  - Preset sizes: Small (400px), Medium (800px), Large (1200px)
+  - Custom dimensions: Specify exact width and/or height in pixels
+
+- **Copy Functionality**: Copy full equation (with wrapper) or SVG code to clipboard
+
+## Setup Instructions
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm or yarn
+- Docker (optional, for containerized deployment)
+
+### Local Development
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Run the development server:
+```bash
+npm run dev
+```
+
+3. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+### Docker Deployment
+
+1. Build the Docker image:
+```bash
+docker build -t tex-math-editor .
+```
+
+2. Run the container:
+```bash
+docker run -p 3000:3000 tex-math-editor
+```
+
+Or use docker-compose:
+```bash
+docker-compose up -d
+```
+
+The application will be available at [http://localhost:3000](http://localhost:3000)
+
+## Usage Guide
+
+### Editing Equations
+
+1. **Select Math Mode**: Choose between equation, inline, or display mode using the buttons in the editor panel
+2. **Type Equation**: Enter your LaTeX equation content in the textarea (e.g., `x = y + z`)
+   - The editor automatically wraps your input with the appropriate delimiters based on the selected mode
+3. **Use Symbol Palette**: Click on symbols from the palette to insert them at your cursor position
+   - Toggle symbol palette visibility with the "Show/Hide Symbol Palette" button
+4. **Live Preview**: See your equation rendered in real-time in the preview panel
+
+### Font Selection
+
+1. Use the font dropdown at the top of the editor panel
+2. Select from available MathJax fonts
+3. The preview updates immediately with the selected font
+
+### Exporting Equations
+
+1. **Choose Format**: Select SVG, PNG, or JPG from the format buttons
+2. **Set Dimensions** (optional):
+   - Use preset buttons: Small, Medium, or Large
+   - Or enter custom width/height in pixels
+   - Leave empty for auto-size
+3. **Export**:
+   - For SVG: Click "Download SVG" to download, or use "Copy SVG Element"/"Copy SVG Document" to copy code
+   - For PNG/JPG: Click the export button to download
+
+### Copying Equations
+
+- **Copy Full Equation**: Use the "Copy Equation" button in the editor to copy the complete equation with wrapper to clipboard
+- **Copy SVG Code**: Use the SVG copy buttons in the export panel to copy SVG code for use in HTML/CSS
+
+## Development
+
+### Project Structure
+
+```
+tex-math-editor/
+├── app/
+│   ├── layout.tsx
+│   ├── page.tsx              # Main editor page
+│   ├── api/
+│   │   └── export/
+│   │       └── route.ts      # Export API endpoint
+│   └── globals.css
+├── components/
+│   ├── EquationEditor.tsx
+│   ├── EquationPreview.tsx
+│   ├── SymbolPalette.tsx     # Mathematical symbol palette
+│   ├── FontSelector.tsx      # Font selection dropdown
+│   └── ExportControls.tsx    # Export UI with dimension controls
+├── lib/
+│   ├── mathjax-config.ts     # MathJax configuration
+│   ├── exportUtils.ts        # Client export helpers
+│   ├── equationUtils.ts      # Equation wrapper and formatting utilities
+│   └── constants.ts          # Export dimension presets and constants
+├── Dockerfile                # Multi-stage Docker build
+├── .dockerignore             # Docker build exclusions
+├── docker-compose.yml        # Docker Compose configuration
+├── README.md                 # Project documentation
+├── package.json
+├── tsconfig.json
+└── next.config.js
+```
+
+### Running in Development Mode
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Building for Production
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Docker Commands
 
-## Learn More
+```bash
+# Build image
+docker build -t tex-math-editor .
 
-To learn more about Next.js, take a look at the following resources:
+# Run container
+docker run -p 3000:3000 tex-math-editor
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Using docker-compose
+docker-compose up -d        # Start in background
+docker-compose down         # Stop
+docker-compose logs -f      # View logs
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## API Documentation
 
-## Deploy on Vercel
+### Export Endpoint
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**POST** `/api/export`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Export a LaTeX equation as an image file or return SVG code.
+
+#### Request Body
+
+```json
+{
+  "equation": "string",          // LaTeX equation (required)
+  "format": "svg" | "png" | "jpg",  // Export format (default: "svg")
+  "font": "string",              // MathJax font name (optional, default: "TeX")
+  "width": number,               // Image width in pixels (optional)
+  "height": number,              // Image height in pixels (optional)
+  "returnCode": boolean,         // For SVG: return code instead of file (optional)
+  "svgFormat": "element" | "document"  // For SVG code: element or document format (optional)
+}
+```
+
+#### Response Formats
+
+- **SVG File**: Returns SVG file with `image/svg+xml` content type
+- **SVG Code**: Returns plain text with SVG code (when `returnCode: true`)
+- **PNG/JPG**: Returns image file with appropriate content type
+
+#### Error Handling
+
+Returns JSON error response with status code 400 or 500:
+```json
+{
+  "error": "Error message"
+}
+```
+
+## License
+
+Private project - all rights reserved.
