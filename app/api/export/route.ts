@@ -11,29 +11,6 @@ import type { FontOption } from "@/lib/constants";
 const adaptor = liteAdaptor();
 RegisterHTMLHandler(adaptor);
 
-// Create a reusable MathJax document instance
-function createMathJaxDocument(font: FontOption = "TeX") {
-  const tex = new TeX({
-    packages: AllPackages,
-    inlineMath: [["\\(", "\\)"]],
-    displayMath: [["\\[", "\\]"]],
-    processEscapes: true,
-    processEnvironments: true,
-  });
-
-  const svg = new SVG({
-    fontCache: "none",
-    font: font,
-  });
-
-  const html = mathjax.document("", {
-    InputJax: tex,
-    OutputJax: svg,
-  });
-
-  return html;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -54,11 +31,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create TeX input
+    const tex = new TeX({
+      packages: AllPackages,
+      inlineMath: [["\\(", "\\)"]],
+      displayMath: [["\\[", "\\]"]],
+      processEscapes: true,
+      processEnvironments: true,
+    });
+
+    // Create SVG output with font configuration
+    // Use default TeX font to avoid font loading issues
+    const svgOptions: any = {
+      fontCache: "none",
+    };
+
+    // Only set font if it's not the default TeX
+    if (font && font !== "TeX") {
+      svgOptions.font = font;
+    }
+
+    const svg = new SVG(svgOptions);
+
     // Create document
-    const doc = createMathJaxDocument(font as FontOption);
-    
-    // Use the document's convert method
-    const node = doc.convert(equation, { display: true });
+    const html = mathjax.document("", {
+      InputJax: tex,
+      OutputJax: svg,
+    });
+
+    // Convert equation - this should work with proper font initialization
+    const node = html.convert(equation, { display: true });
     let svgContent = adaptor.outerHTML(node);
 
     // Apply dimensions if provided
@@ -109,8 +111,12 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("Export error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to export equation";
-    console.error("Full error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to export equation";
+    console.error(
+      "Full error stack:",
+      error instanceof Error ? error.stack : String(error)
+    );
     return NextResponse.json(
       {
         error: errorMessage,
