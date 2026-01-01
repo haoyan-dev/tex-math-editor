@@ -1,5 +1,5 @@
 import type { ExportFormat, FontOption, MathMode, SVGFormat } from './constants';
-import { getFullEquation } from './equationUtils';
+import { getFullEquation, unwrapEquation } from './equationUtils';
 import { mapFontNameToMathJaxV4 } from './mathjax-config';
 
 interface ExportImageOptions {
@@ -124,19 +124,32 @@ async function renderEquationToSVG(
   // Try tex2svgPromise first (if available in browser MathJax v4)
   if (window.MathJax.tex2svgPromise) {
     try {
-      const node = await window.MathJax.tex2svgPromise(equation, {
+      const options: {
+        display?: boolean;
+        em?: number;
+        ex?: number;
+        containerWidth?: number;
+      } = {
         display: display,
         em: EM,
         ex: EX,
-        containerWidth: WIDTH,
-      });
-
-      // Extract SVG element from MathJax output
-      const svgElement = node.querySelector('svg');
-      if (svgElement) {
-        const serializer = new XMLSerializer();
-        return serializer.serializeToString(svgElement);
+      };
+      
+      // For display mode, use containerWidth for line breaking
+      // For inline mode, use a very large width to prevent unwanted wrapping
+      // Inline math should stay on one line
+      if (display) {
+        options.containerWidth = WIDTH;
+      } else {
+        options.containerWidth = 10000 * EM;
       }
+      
+      const node = await window.MathJax.tex2svgPromise(equation, options);
+
+      // Export the entire mjx-container (or the node itself) to preserve multi-line layout
+      // The node from tex2svgPromise is typically an mjx-container element
+      const serializer = new XMLSerializer();
+      return serializer.serializeToString(node);
     } catch (error) {
       console.warn('tex2svgPromise failed, falling back to DOM method:', error);
     }
@@ -159,29 +172,56 @@ async function renderEquationToSVG(
     // Typeset the equation
     await window.MathJax.typesetPromise([container]);
 
-    // Find the SVG element in the rendered output
+    // Find the mjx-container element in the rendered output
     const mjxContainer = container.querySelector('mjx-container');
     if (!mjxContainer) {
       throw new Error('MathJax did not render the equation');
     }
 
-    const svgElement = mjxContainer.querySelector('svg');
-    if (!svgElement) {
-      throw new Error('SVG element not found in MathJax output');
-    }
-
-    // Clone the SVG to avoid modifying the original
-    const svgClone = svgElement.cloneNode(true) as SVGElement;
+    // Clone the mjx-container to avoid modifying the original
+    const mjxClone = mjxContainer.cloneNode(true) as Element;
     
-    // Serialize to string
+    // Serialize the entire mjx-container to preserve multi-line layout
     const serializer = new XMLSerializer();
-    const svgString = serializer.serializeToString(svgClone);
+    const svgString = serializer.serializeToString(mjxClone);
 
     return svgString;
   } finally {
     // Clean up the temporary container
     document.body.removeChild(container);
   }
+}
+
+/**
+ * Extract SVG element from mjx-container string
+ * Returns the SVG content if the input is mjx-container, otherwise returns the input as-is
+ */
+function extractSVGFromMjxContainer(content: string): string {
+  // Check if content contains mjx-container
+  if (content.includes('<mjx-container')) {
+    // Try to parse and extract SVG element
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'text/html');
+    const mjxContainer = doc.querySelector('mjx-container');
+    
+    if (mjxContainer) {
+      // Find SVG element within mjx-container
+      const svgElement = mjxContainer.querySelector('svg');
+      if (svgElement) {
+        const serializer = new XMLSerializer();
+        return serializer.serializeToString(svgElement);
+      }
+    }
+    
+    // Fallback: try regex extraction
+    const svgMatch = content.match(/<svg[^>]*>[\s\S]*?<\/svg>/i);
+    if (svgMatch) {
+      return svgMatch[0];
+    }
+  }
+  
+  // If no mjx-container found, return as-is (might already be SVG)
+  return content;
 }
 
 /**
@@ -286,11 +326,15 @@ export async function getSVGDimensions(
   mathMode: MathMode,
   font: FontOption
 ): Promise<{ width: number; height: number }> {
-  const fullEquation = getFullEquation(equation, mathMode);
+  // Unwrap equation to get raw content (MathJax will use display parameter to determine mode)
+  const rawEquation = unwrapEquation(equation, mathMode);
   const display = mathMode !== 'inline';
   
-  // Render equation to SVG
-  const svgContent = await renderEquationToSVG(fullEquation, font, display);
+  // Render equation to SVG with raw content and display parameter
+  let svgContent = await renderEquationToSVG(rawEquation, font, display);
+  
+  // Extract SVG from mjx-container if needed (for dimension extraction)
+  svgContent = extractSVGFromMjxContainer(svgContent);
   
   // Parse SVG to extract dimensions
   // Try to get width and height attributes first
@@ -483,14 +527,16 @@ export async function exportImage(options: ExportImageOptions): Promise<void> {
     quality,
     filename = 'eq'
   } = options;
-  const fullEquation = getFullEquation(equation, mathMode);
+  
+  // Unwrap equation to get raw content (MathJax will use display parameter to determine mode)
+  const rawEquation = unwrapEquation(equation, mathMode);
 
   try {
     // Determine display mode based on math mode
     const display = mathMode !== 'inline';
 
-    // Render equation to SVG
-    let svgContent = await renderEquationToSVG(fullEquation, font, display);
+    // Render equation to SVG with raw content and display parameter
+    let svgContent = await renderEquationToSVG(rawEquation, font, display);
 
     // Calculate effective dimensions: apply scale to base dimensions
     let effectiveWidth: number | string | undefined = width;
@@ -499,7 +545,9 @@ export async function exportImage(options: ExportImageOptions): Promise<void> {
     // For SVG format, if scale is provided but width/height are not,
     // extract current SVG dimensions and apply scale to them
     if (format === 'svg' && scale && scale !== 1 && !effectiveWidth && !effectiveHeight) {
-      const currentDims = extractSVGDimensions(svgContent);
+      // Extract SVG from mjx-container for dimension extraction
+      const svgForDims = extractSVGFromMjxContainer(svgContent);
+      const currentDims = extractSVGDimensions(svgForDims);
       if (currentDims) {
         const scaledWidth = currentDims.width * scale;
         const scaledHeight = currentDims.height * scale;
@@ -517,18 +565,23 @@ export async function exportImage(options: ExportImageOptions): Promise<void> {
       svgContent = applyDimensions(svgContent, effectiveWidth, effectiveHeight);
     }
 
-    // Remove x_height attributes for image export
-    svgContent = removeXHeightAttributes(svgContent);
-
     if (format === 'svg') {
-      // Export SVG directly
+      // For SVG format, export mjx-container directly (preserves multi-line layout)
+      // Remove x_height attributes for image export
+      svgContent = removeXHeightAttributes(svgContent);
       const blob = new Blob([svgContent], { type: 'image/svg+xml' });
       downloadBlob(blob, `${filename}.svg`);
     } else if (format === 'png' || format === 'jpg') {
+      // For PNG/JPG, extract SVG from mjx-container (canvas needs pure SVG)
+      let pureSvg = extractSVGFromMjxContainer(svgContent);
+      
+      // Remove x_height attributes for image export
+      pureSvg = removeXHeightAttributes(pureSvg);
+      
       // Convert SVG to canvas, then to blob
       // Note: DPI and scale are applied in svgToCanvas
       const canvas = await svgToCanvas(
-        svgContent, 
+        pureSvg, 
         width, 
         height, 
         dpi, 
@@ -552,14 +605,16 @@ export async function exportImage(options: ExportImageOptions): Promise<void> {
  */
 export async function copySVGCode(options: CopySVGOptions): Promise<string> {
   const { equation, mathMode, font = 'TeX', svgFormat } = options;
-  const fullEquation = getFullEquation(equation, mathMode);
+  
+  // Unwrap equation to get raw content (MathJax will use display parameter to determine mode)
+  const rawEquation = unwrapEquation(equation, mathMode);
 
   try {
     // Determine display mode based on math mode
     const display = mathMode !== 'inline';
 
-    // Render equation to SVG
-    let svgContent = await renderEquationToSVG(fullEquation, font, display);
+    // Render equation to SVG with raw content and display parameter
+    let svgContent = await renderEquationToSVG(rawEquation, font, display);
 
     // Format SVG based on requested format
     if (svgFormat === 'document') {
