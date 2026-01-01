@@ -13,17 +13,10 @@ export const MATH_MODES: { value: MathMode; label: string }[] = [
 ];
 
 // Font options
-export type FontOption = 'TeX' | 'STIX' | 'Asana-Math' | 'Latin-Modern' | 'Computer-Modern' | 'Neo-Euler' | 'Gyre-Pagella' | 'Gyre-Termes';
+export type FontOption = 'TeX';
 
 export const FONT_OPTIONS: { value: FontOption; label: string }[] = [
   { value: 'TeX', label: 'TeX (Default)' },
-  { value: 'STIX', label: 'STIX' },
-  { value: 'Asana-Math', label: 'Asana Math' },
-  { value: 'Latin-Modern', label: 'Latin Modern' },
-  { value: 'Computer-Modern', label: 'Computer Modern' },
-  { value: 'Neo-Euler', label: 'Neo Euler' },
-  { value: 'Gyre-Pagella', label: 'Gyre Pagella' },
-  { value: 'Gyre-Termes', label: 'Gyre Termes' },
 ];
 
 export const DEFAULT_FONT: FontOption = 'TeX';

@@ -11,7 +11,7 @@ interface EquationEditorProps {
   mathMode: MathMode;
   onChange: (value: string) => void;
   onMathModeChange: (mode: MathMode) => void;
-  onCopyEquation?: () => void;
+  onCopyEquation?: (copiedContent: string) => void;
 }
 
 export default function EquationEditor({
@@ -82,7 +82,7 @@ export default function EquationEditor({
   const handleCopy = useCallback(() => {
     const fullEquation = getFullEquation(value, mathMode);
     navigator.clipboard.writeText(fullEquation).then(() => {
-      onCopyEquation?.();
+      onCopyEquation?.(fullEquation);
     });
   }, [value, mathMode, onCopyEquation]);
 

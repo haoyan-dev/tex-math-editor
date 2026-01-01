@@ -8,16 +8,16 @@ interface ExportControlsProps {
   equation: string;
   mathMode: MathMode;
   font: FontOption;
+  onCopySVG?: (copiedContent: string) => void;
 }
 
-export default function ExportControls({ equation, mathMode, font }: ExportControlsProps) {
+export default function ExportControls({ equation, mathMode, font, onCopySVG }: ExportControlsProps) {
   const [format, setFormat] = useState<ExportFormat>('svg');
   const [width, setWidth] = useState<number | undefined>(undefined);
   const [height, setHeight] = useState<number | undefined>(undefined);
   const [customWidth, setCustomWidth] = useState<string>('');
   const [customHeight, setCustomHeight] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
 
   const handlePresetSize = (presetWidth: number) => {
     setWidth(presetWidth);
@@ -53,14 +53,13 @@ export default function ExportControls({ equation, mathMode, font }: ExportContr
 
   const handleCopySVG = async (svgFormat: SVGFormat) => {
     try {
-      await copySVGCode({
+      const svgCode = await copySVGCode({
         equation,
         mathMode,
         font,
         svgFormat,
       });
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      onCopySVG?.(svgCode);
     } catch (error) {
       alert('Failed to copy SVG: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
@@ -194,14 +193,6 @@ export default function ExportControls({ equation, mathMode, font }: ExportContr
               Copy SVG Document
             </button>
           </div>
-          {copySuccess && (
-            <p className="text-sm text-green-600 font-medium flex items-center gap-2">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              Copied to clipboard!
-            </p>
-          )}
         </div>
       ) : (
         <button

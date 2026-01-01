@@ -7,18 +7,28 @@ import EquationEditor from '@/components/EquationEditor';
 import EquationPreview from '@/components/EquationPreview';
 import FontSelector from '@/components/FontSelector';
 import ExportControls from '@/components/ExportControls';
+import CopyNotificationModal from '@/components/CopyNotificationModal';
 
 export default function Home() {
   const [equation, setEquation] = useState('');
   const [mathMode, setMathMode] = useState<MathMode>('equation');
   const [font, setFont] = useState<FontOption>(DEFAULT_FONT);
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copiedContent, setCopiedContent] = useState('');
+  const [modalTitle, setModalTitle] = useState('Copied to Clipboard!');
 
   const wrappedEquation = wrapEquation(equation, mathMode);
 
-  const handleCopyEquation = () => {
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
+  const handleCopyEquation = (content: string) => {
+    setCopiedContent(content);
+    setModalTitle('Equation Copied to Clipboard!');
+    setShowCopyModal(true);
+  };
+
+  const handleCopySVG = (content: string) => {
+    setCopiedContent(content);
+    setModalTitle('SVG Code Copied to Clipboard!');
+    setShowCopyModal(true);
   };
 
   return (
@@ -47,16 +57,6 @@ export default function Home() {
               onCopyEquation={handleCopyEquation}
             />
           </div>
-          {copySuccess && (
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-t border-green-200 p-2.5 shadow-inner flex-shrink-0">
-              <p className="text-sm text-green-700 text-center font-medium flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Equation copied to clipboard!
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Right Panel - Preview and Export */}
@@ -69,10 +69,18 @@ export default function Home() {
               equation={equation}
               mathMode={mathMode}
               font={font}
+              onCopySVG={handleCopySVG}
             />
           </div>
         </div>
       </div>
+
+      <CopyNotificationModal
+        isOpen={showCopyModal}
+        copiedContent={copiedContent}
+        title={modalTitle}
+        onClose={() => setShowCopyModal(false)}
+      />
     </div>
   );
 }

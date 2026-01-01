@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { FontOption } from '@/lib/constants';
+import { mapFontNameToMathJaxV4 } from '@/lib/mathjax-config';
 
 interface EquationPreviewProps {
   equation: string;
@@ -26,13 +27,16 @@ export default function EquationPreview({ equation, font = 'TeX' }: EquationPrev
   const equationTextRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load MathJax from CDN
+    // Load MathJax from CDN (only once)
     if (!window.MathJax) {
       const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js';
+      script.src = 'https://cdn.jsdelivr.net/npm/mathjax@4/tex-svg.js';
       script.async = true;
       script.onload = () => {
         if (window.MathJax) {
+          // Set initial configuration with current font
+          // Map user-facing font name to MathJax v4 font name
+          const mathJaxFontName = mapFontNameToMathJaxV4(font);
           window.MathJax.config = {
             tex: {
               inlineMath: [['\\(', '\\)']],
@@ -40,9 +44,11 @@ export default function EquationPreview({ equation, font = 'TeX' }: EquationPrev
               processEscapes: true,
               processEnvironments: true,
             },
+            output: {
+              font: mathJaxFontName,
+            },
             svg: {
               fontCache: 'global',
-              font: font,
             },
           };
           mathJaxLoadedRef.current = true;
@@ -62,28 +68,33 @@ export default function EquationPreview({ equation, font = 'TeX' }: EquationPrev
   useEffect(() => {
     // Re-typeset when equation or font changes
     if (window.MathJax && containerRef.current && equation && mathJaxLoadedRef.current) {
-      // Update font config
+      // Update font config BEFORE typesetting
+      // Map user-facing font name to MathJax v4 font name
       if (window.MathJax.config) {
-        window.MathJax.config.svg = {
-          ...window.MathJax.config.svg,
-          font: font,
-        };
+        const mathJaxFontName = mapFontNameToMathJaxV4(font);
+        // In v4, font is configured in the output block
+        if (!window.MathJax.config.output) {
+          window.MathJax.config.output = {};
+        }
+        window.MathJax.config.output.font = mathJaxFontName;
       }
       
       // Use requestAnimationFrame to ensure React has finished rendering
       // before MathJax processes the content
       requestAnimationFrame(() => {
         if (window.MathJax && containerRef.current && equation && equationTextRef.current) {
-          // Find and remove any existing MathJax processed elements
+          // Clear only MathJax-generated elements, not the equation text element
           const mjxContainers = containerRef.current.querySelectorAll('mjx-container');
           mjxContainers.forEach(container => container.remove());
           
-          // Ensure the equation text is present (React should have set it via the key remount)
+          // Ensure the equation text is present and set correctly
+          // (React's key prop should have already updated it, but ensure it's correct)
           if (equationTextRef.current.textContent !== equation) {
             equationTextRef.current.textContent = equation;
           }
           
-          // Re-typeset with the new font
+          // Re-typeset with the new font configuration
+          // MathJax will use the updated font from config
           window.MathJax.typesetPromise([containerRef.current]).catch((err) => {
             console.error('MathJax typeset error:', err);
           });
