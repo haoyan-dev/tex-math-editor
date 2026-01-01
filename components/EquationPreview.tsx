@@ -23,6 +23,7 @@ declare global {
 export default function EquationPreview({ equation, font = 'TeX' }: EquationPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mathJaxLoadedRef = useRef(false);
+  const equationTextRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Load MathJax from CDN
@@ -61,15 +62,32 @@ export default function EquationPreview({ equation, font = 'TeX' }: EquationPrev
   useEffect(() => {
     // Re-typeset when equation or font changes
     if (window.MathJax && containerRef.current && equation && mathJaxLoadedRef.current) {
-      // Update font config if changed
+      // Update font config
       if (window.MathJax.config) {
         window.MathJax.config.svg = {
           ...window.MathJax.config.svg,
           font: font,
         };
       }
-      window.MathJax.typesetPromise([containerRef.current]).catch((err) => {
-        console.error('MathJax typeset error:', err);
+      
+      // Use requestAnimationFrame to ensure React has finished rendering
+      // before MathJax processes the content
+      requestAnimationFrame(() => {
+        if (window.MathJax && containerRef.current && equation && equationTextRef.current) {
+          // Find and remove any existing MathJax processed elements
+          const mjxContainers = containerRef.current.querySelectorAll('mjx-container');
+          mjxContainers.forEach(container => container.remove());
+          
+          // Ensure the equation text is present (React should have set it via the key remount)
+          if (equationTextRef.current.textContent !== equation) {
+            equationTextRef.current.textContent = equation;
+          }
+          
+          // Re-typeset with the new font
+          window.MathJax.typesetPromise([containerRef.current]).catch((err) => {
+            console.error('MathJax typeset error:', err);
+          });
+        }
       });
     } else if (window.MathJax && containerRef.current && !equation && mathJaxLoadedRef.current) {
       // Clear the container when equation is empty
@@ -98,7 +116,13 @@ export default function EquationPreview({ equation, font = 'TeX' }: EquationPrev
       ref={containerRef}
       className="h-full overflow-auto p-8 bg-gradient-to-br from-gray-50 via-white to-gray-50"
     >
-      <div className="flex items-center justify-center min-h-full py-4">{equation}</div>
+      <div 
+        key={`${font}-${equation}`}
+        ref={equationTextRef}
+        className="flex items-center justify-center min-h-full py-4"
+      >
+        {equation}
+      </div>
     </div>
   );
 }
