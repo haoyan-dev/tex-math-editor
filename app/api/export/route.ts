@@ -143,6 +143,11 @@ export async function POST(request: NextRequest) {
       height,
       returnCode,
       svgFormat,
+      dpi,
+      scale,
+      alphaChannel,
+      quality,
+      filename = "eq",
     } = body;
 
     if (!equation || typeof equation !== "string") {
@@ -183,9 +188,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Calculate effective dimensions: apply scale to base dimensions
+    let effectiveWidth: number | string | undefined = width;
+    let effectiveHeight: number | string | undefined = height;
+    
+    // For SVG format, if scale is provided but width/height are not,
+    // extract current SVG dimensions and apply scale to them
+    if (format === "svg" && scale && scale !== 1 && !effectiveWidth && !effectiveHeight) {
+      const currentDims = extractSVGDimensions(svgContent);
+      if (currentDims) {
+        const scaledWidth = currentDims.width * scale;
+        const scaledHeight = currentDims.height * scale;
+        // Preserve units if they existed in the original
+        effectiveWidth = currentDims.widthUnit ? `${scaledWidth}${currentDims.widthUnit}` : scaledWidth;
+        effectiveHeight = currentDims.heightUnit ? `${scaledHeight}${currentDims.heightUnit}` : scaledHeight;
+      }
+    } else if (scale && scale !== 1) {
+      if (effectiveWidth) effectiveWidth = (effectiveWidth as number) * scale;
+      if (effectiveHeight) effectiveHeight = (effectiveHeight as number) * scale;
+    }
+
     // Apply dimensions if provided
-    if (width || height) {
-      svgContent = applyDimensions(svgContent, width, height);
+    if (effectiveWidth !== undefined || effectiveHeight !== undefined) {
+      svgContent = applyDimensions(svgContent, effectiveWidth, effectiveHeight);
     }
 
     if (format === "svg") {
@@ -213,7 +238,7 @@ export async function POST(request: NextRequest) {
         return new NextResponse(svgContent, {
           headers: {
             "Content-Type": "image/svg+xml",
-            "Content-Disposition": 'attachment; filename="equation.svg"',
+            "Content-Disposition": `attachment; filename="${filename}.svg"`,
           },
         });
       }
@@ -222,14 +247,22 @@ export async function POST(request: NextRequest) {
       if (svgContent) {
         svgContent = removeXHeightAttributes(svgContent);
       }
-      const buffer = await convertSVGToImage(svgContent, format, width, height);
+      const buffer = await convertSVGToImage(
+        svgContent, 
+        format, 
+        effectiveWidth, 
+        effectiveHeight,
+        dpi,
+        format === "png" ? alphaChannel : false,
+        format === "jpg" ? quality : undefined
+      );
       const mimeType = format === "png" ? "image/png" : "image/jpeg";
       const extension = format === "png" ? "png" : "jpg";
 
       return new NextResponse(buffer as unknown as BodyInit, {
         headers: {
           "Content-Type": mimeType,
-          "Content-Disposition": `attachment; filename="equation.${extension}"`,
+          "Content-Disposition": `attachment; filename="${filename}.${extension}"`,
         },
       });
     } else {
@@ -279,18 +312,62 @@ function extractSVGFromContainer(htmlContent: string): string {
   return htmlContent;
 }
 
+/**
+ * Extract width and height from SVG content string
+ * Returns dimensions with numeric values and units preserved
+ */
+function extractSVGDimensions(svgContent: string): { width: number; height: number; widthUnit?: string; heightUnit?: string } | null {
+  // Try to get width and height attributes first
+  const widthMatch = svgContent.match(/width\s*=\s*["']([^"']+)["']/i);
+  const heightMatch = svgContent.match(/height\s*=\s*["']([^"']+)["']/i);
+  
+  if (widthMatch && heightMatch) {
+    const widthValue = widthMatch[1];
+    const heightValue = heightMatch[1];
+    
+    // Extract numeric value and unit separately
+    const widthNumMatch = widthValue.match(/^([\d.]+)(.*)$/);
+    const heightNumMatch = heightValue.match(/^([\d.]+)(.*)$/);
+    
+    if (widthNumMatch && heightNumMatch) {
+      const widthPx = parseFloat(widthNumMatch[1]);
+      const heightPx = parseFloat(heightNumMatch[1]);
+      const widthUnit = widthNumMatch[2] || '';
+      const heightUnit = heightNumMatch[2] || '';
+      
+      if (!isNaN(widthPx) && !isNaN(heightPx)) {
+        return { width: widthPx, height: heightPx, widthUnit, heightUnit };
+      }
+    }
+  }
+  
+  // Fallback to viewBox if width/height not present or invalid
+  const viewBoxMatch = svgContent.match(/viewBox\s*=\s*["']([^"']+)["']/i);
+  if (viewBoxMatch) {
+    const viewBoxValues = viewBoxMatch[1].split(/\s+/).map(v => parseFloat(v));
+    if (viewBoxValues.length >= 4 && !viewBoxValues.some(isNaN)) {
+      // viewBox values don't have units, so no unit preserved
+      return { width: viewBoxValues[2], height: viewBoxValues[3] };
+    }
+  }
+  
+  return null;
+}
+
 function applyDimensions(
   svgContent: string,
-  width?: number,
-  height?: number
+  width?: number | string,
+  height?: number | string
 ): string {
   let newSvg = svgContent;
 
-  if (width) {
-    newSvg = newSvg.replace(/width="[^"]*"/, `width="${width}"`);
+  if (width !== undefined) {
+    const widthValue = typeof width === 'string' ? width : String(width);
+    newSvg = newSvg.replace(/width="[^"]*"/, `width="${widthValue}"`);
   }
-  if (height) {
-    newSvg = newSvg.replace(/height="[^"]*"/, `height="${height}"`);
+  if (height !== undefined) {
+    const heightValue = typeof height === 'string' ? height : String(height);
+    newSvg = newSvg.replace(/height="[^"]*"/, `height="${heightValue}"`);
   }
 
   return newSvg;
@@ -334,11 +411,17 @@ async function convertSVGToImage(
   svgContent: string,
   format: "png" | "jpg",
   width?: number,
-  height?: number
+  height?: number,
+  dpi?: number,
+  alphaChannel?: boolean,
+  quality?: number
 ): Promise<Buffer> {
   try {
+    // Use provided DPI or default to 300
+    const exportDpi = dpi || 300;
+    
     let pipeline = sharp(Buffer.from(svgContent), {
-      density: 300, // High DPI for better quality
+      density: exportDpi,
     });
 
     if (width || height) {
@@ -349,9 +432,27 @@ async function convertSVGToImage(
     }
 
     if (format === "png") {
-      return pipeline.png().toBuffer();
+      // Configure PNG options
+      const pngOptions: sharp.PngOptions = {
+        compressionLevel: 9,
+      };
+      
+      // Handle alpha channel
+      if (alphaChannel) {
+        // Preserve transparency - sharp will handle this automatically
+        // No background compositing needed
+      } else {
+        // Ensure white background when alpha channel is disabled
+        // Flatten onto white background
+        pipeline = pipeline.flatten({ background: { r: 255, g: 255, b: 255 } });
+      }
+      
+      return pipeline.png(pngOptions).toBuffer();
     } else {
-      return pipeline.jpeg({ quality: 90 }).toBuffer();
+      // JPG always has opaque background
+      // Use provided quality or default to 90
+      const jpgQuality = quality !== undefined ? quality : 90;
+      return pipeline.jpeg({ quality: jpgQuality }).toBuffer();
     }
   } catch (sharpError) {
     console.error("Sharp conversion error:", sharpError);

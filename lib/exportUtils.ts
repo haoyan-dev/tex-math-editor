@@ -9,6 +9,11 @@ interface ExportImageOptions {
   font?: FontOption;
   width?: number;
   height?: number;
+  dpi?: number;
+  scale?: number;
+  alphaChannel?: boolean;
+  quality?: number;
+  filename?: string;
 }
 
 interface CopySVGOptions {
@@ -180,20 +185,64 @@ async function renderEquationToSVG(
 }
 
 /**
+ * Extract width and height from SVG content string
+ * Returns dimensions with numeric values and units preserved
+ */
+function extractSVGDimensions(svgContent: string): { width: number; height: number; widthUnit?: string; heightUnit?: string } | null {
+  // Try to get width and height attributes first
+  const widthMatch = svgContent.match(/width\s*=\s*["']([^"']+)["']/i);
+  const heightMatch = svgContent.match(/height\s*=\s*["']([^"']+)["']/i);
+  
+  if (widthMatch && heightMatch) {
+    const widthValue = widthMatch[1];
+    const heightValue = heightMatch[1];
+    
+    // Extract numeric value and unit separately
+    const widthNumMatch = widthValue.match(/^([\d.]+)(.*)$/);
+    const heightNumMatch = heightValue.match(/^([\d.]+)(.*)$/);
+    
+    if (widthNumMatch && heightNumMatch) {
+      const widthPx = parseFloat(widthNumMatch[1]);
+      const heightPx = parseFloat(heightNumMatch[1]);
+      const widthUnit = widthNumMatch[2] || '';
+      const heightUnit = heightNumMatch[2] || '';
+      
+      if (!isNaN(widthPx) && !isNaN(heightPx)) {
+        return { width: widthPx, height: heightPx, widthUnit, heightUnit };
+      }
+    }
+  }
+  
+  // Fallback to viewBox if width/height not present or invalid
+  const viewBoxMatch = svgContent.match(/viewBox\s*=\s*["']([^"']+)["']/i);
+  if (viewBoxMatch) {
+    const viewBoxValues = viewBoxMatch[1].split(/\s+/).map(v => parseFloat(v));
+    if (viewBoxValues.length >= 4 && !viewBoxValues.some(isNaN)) {
+      // viewBox values don't have units, so no unit preserved
+      return { width: viewBoxValues[2], height: viewBoxValues[3] };
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Apply dimensions to SVG string
  */
 function applyDimensions(
   svgContent: string,
-  width?: number,
-  height?: number
+  width?: number | string,
+  height?: number | string
 ): string {
   let newSvg = svgContent;
 
-  if (width) {
-    newSvg = newSvg.replace(/width="[^"]*"/, `width="${width}"`);
+  if (width !== undefined) {
+    const widthValue = typeof width === 'string' ? width : String(width);
+    newSvg = newSvg.replace(/width="[^"]*"/, `width="${widthValue}"`);
   }
-  if (height) {
-    newSvg = newSvg.replace(/height="[^"]*"/, `height="${height}"`);
+  if (height !== undefined) {
+    const heightValue = typeof height === 'string' ? height : String(height);
+    newSvg = newSvg.replace(/height="[^"]*"/, `height="${heightValue}"`);
   }
 
   return newSvg;
@@ -229,12 +278,83 @@ ${svgBody}
 }
 
 /**
+ * Get SVG dimensions from rendered equation
+ * Returns dimensions in em units (based on EM = 16px = 1em)
+ */
+export async function getSVGDimensions(
+  equation: string,
+  mathMode: MathMode,
+  font: FontOption
+): Promise<{ width: number; height: number }> {
+  const fullEquation = getFullEquation(equation, mathMode);
+  const display = mathMode !== 'inline';
+  
+  // Render equation to SVG
+  const svgContent = await renderEquationToSVG(fullEquation, font, display);
+  
+  // Parse SVG to extract dimensions
+  // Try to get width and height attributes first
+  const widthMatch = svgContent.match(/width\s*=\s*["']([^"']+)["']/i);
+  const heightMatch = svgContent.match(/height\s*=\s*["']([^"']+)["']/i);
+  
+  let widthPx: number;
+  let heightPx: number;
+  
+  if (widthMatch && heightMatch) {
+    // Extract numeric values (handle units like px, pt, etc.)
+    const widthStr = widthMatch[1].replace(/[^\d.]/g, '');
+    const heightStr = heightMatch[1].replace(/[^\d.]/g, '');
+    widthPx = parseFloat(widthStr) || 0;
+    heightPx = parseFloat(heightStr) || 0;
+  } else {
+    // Fallback to viewBox if width/height not present
+    const viewBoxMatch = svgContent.match(/viewBox\s*=\s*["']([^"']+)["']/i);
+    if (viewBoxMatch) {
+      const viewBoxValues = viewBoxMatch[1].split(/\s+/).map(v => parseFloat(v));
+      if (viewBoxValues.length >= 4) {
+        widthPx = viewBoxValues[2];
+        heightPx = viewBoxValues[3];
+      } else {
+        throw new Error('Unable to extract dimensions from SVG');
+      }
+    } else {
+      // Last resort: try to get from bounding box by rendering to DOM
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+      const svgElement = svgDoc.querySelector('svg');
+      if (svgElement) {
+        // Create a temporary SVG element to measure
+        const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        tempSvg.innerHTML = svgElement.innerHTML;
+        tempSvg.setAttribute('style', 'position: absolute; visibility: hidden;');
+        document.body.appendChild(tempSvg);
+        const bbox = tempSvg.getBBox();
+        widthPx = bbox.width;
+        heightPx = bbox.height;
+        document.body.removeChild(tempSvg);
+      } else {
+        throw new Error('Unable to extract dimensions from SVG');
+      }
+    }
+  }
+  
+  // Convert pixel dimensions to em units (EM = 16px = 1em)
+  const widthEm = widthPx / EM;
+  const heightEm = heightPx / EM;
+  
+  return { width: widthEm, height: heightEm };
+}
+
+/**
  * Convert SVG string to canvas element
  */
 async function svgToCanvas(
   svgString: string,
   width?: number,
-  height?: number
+  height?: number,
+  dpi?: number,
+  scale?: number,
+  alphaChannel?: boolean
 ): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -242,7 +362,7 @@ async function svgToCanvas(
     const url = URL.createObjectURL(svgBlob);
 
     img.onload = () => {
-      // Calculate canvas dimensions
+      // Calculate base canvas dimensions
       let canvasWidth = img.width;
       let canvasHeight = img.height;
 
@@ -261,10 +381,25 @@ async function svgToCanvas(
         }
       }
 
+      // Apply scale if provided
+      if (scale && scale !== 1) {
+        canvasWidth = canvasWidth * scale;
+        canvasHeight = canvasHeight * scale;
+      }
+
+      // Apply DPI scaling if provided (for raster formats)
+      // DPI scaling: multiply by (dpi / 96) where 96 is standard screen DPI
+      if (dpi && dpi !== 96) {
+        const dpiScale = dpi / 96;
+        canvasWidth = canvasWidth * dpiScale;
+        canvasHeight = canvasHeight * dpiScale;
+      }
+
       const canvas = document.createElement('canvas');
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
-      const ctx = canvas.getContext('2d');
+      // Always use alpha context for proper rendering, but fill with white if alphaChannel is false
+      const ctx = canvas.getContext('2d', { alpha: true });
 
       if (!ctx) {
         URL.revokeObjectURL(url);
@@ -272,9 +407,11 @@ async function svgToCanvas(
         return;
       }
 
-      // Draw white background
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      // Draw background only if alpha channel is disabled
+      if (!alphaChannel) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      }
 
       // Draw SVG image
       ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
@@ -295,10 +432,11 @@ async function svgToCanvas(
 /**
  * Convert canvas to blob
  */
-function canvasToBlob(canvas: HTMLCanvasElement, format: 'png' | 'jpg'): Promise<Blob> {
+function canvasToBlob(canvas: HTMLCanvasElement, format: 'png' | 'jpg', quality?: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
-    const quality = format === 'jpg' ? 0.9 : undefined;
+    // Use provided quality for JPG, or default to 0.9 if not provided
+    const jpgQuality = format === 'jpg' ? (quality !== undefined ? quality / 100 : 0.9) : undefined;
 
     canvas.toBlob(
       (blob) => {
@@ -309,7 +447,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, format: 'png' | 'jpg'): Promise
         }
       },
       mimeType,
-      quality
+      jpgQuality
     );
   });
 }
@@ -332,7 +470,19 @@ function downloadBlob(blob: Blob, filename: string): void {
  * Export equation as image file
  */
 export async function exportImage(options: ExportImageOptions): Promise<void> {
-  const { equation, mathMode, format, font = 'TeX', width, height } = options;
+  const { 
+    equation, 
+    mathMode, 
+    format, 
+    font = 'TeX', 
+    width, 
+    height,
+    dpi,
+    scale,
+    alphaChannel,
+    quality,
+    filename = 'eq'
+  } = options;
   const fullEquation = getFullEquation(equation, mathMode);
 
   try {
@@ -342,9 +492,29 @@ export async function exportImage(options: ExportImageOptions): Promise<void> {
     // Render equation to SVG
     let svgContent = await renderEquationToSVG(fullEquation, font, display);
 
+    // Calculate effective dimensions: apply scale to base dimensions
+    let effectiveWidth: number | string | undefined = width;
+    let effectiveHeight: number | string | undefined = height;
+    
+    // For SVG format, if scale is provided but width/height are not,
+    // extract current SVG dimensions and apply scale to them
+    if (format === 'svg' && scale && scale !== 1 && !effectiveWidth && !effectiveHeight) {
+      const currentDims = extractSVGDimensions(svgContent);
+      if (currentDims) {
+        const scaledWidth = currentDims.width * scale;
+        const scaledHeight = currentDims.height * scale;
+        // Preserve units if they existed in the original
+        effectiveWidth = currentDims.widthUnit ? `${scaledWidth}${currentDims.widthUnit}` : scaledWidth;
+        effectiveHeight = currentDims.heightUnit ? `${scaledHeight}${currentDims.heightUnit}` : scaledHeight;
+      }
+    } else if (scale && scale !== 1) {
+      if (effectiveWidth) effectiveWidth = (effectiveWidth as number) * scale;
+      if (effectiveHeight) effectiveHeight = (effectiveHeight as number) * scale;
+    }
+
     // Apply dimensions if provided
-    if (width || height) {
-      svgContent = applyDimensions(svgContent, width, height);
+    if (effectiveWidth !== undefined || effectiveHeight !== undefined) {
+      svgContent = applyDimensions(svgContent, effectiveWidth, effectiveHeight);
     }
 
     // Remove x_height attributes for image export
@@ -353,13 +523,21 @@ export async function exportImage(options: ExportImageOptions): Promise<void> {
     if (format === 'svg') {
       // Export SVG directly
       const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-      downloadBlob(blob, 'equation.svg');
+      downloadBlob(blob, `${filename}.svg`);
     } else if (format === 'png' || format === 'jpg') {
       // Convert SVG to canvas, then to blob
-      const canvas = await svgToCanvas(svgContent, width, height);
-      const blob = await canvasToBlob(canvas, format);
+      // Note: DPI and scale are applied in svgToCanvas
+      const canvas = await svgToCanvas(
+        svgContent, 
+        width, 
+        height, 
+        dpi, 
+        scale, 
+        format === 'png' ? alphaChannel : false
+      );
+      const blob = await canvasToBlob(canvas, format, quality);
       const extension = format === 'png' ? 'png' : 'jpg';
-      downloadBlob(blob, `equation.${extension}`);
+      downloadBlob(blob, `${filename}.${extension}`);
     } else {
       throw new Error(`Unsupported format: ${format}`);
     }

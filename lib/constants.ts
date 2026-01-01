@@ -33,6 +33,60 @@ export const EXPORT_FORMATS: { value: ExportFormat; label: string }[] = [
 // SVG format types
 export type SVGFormat = 'element' | 'document';
 
+// DPI presets for export
+export type DPIPreset = 150 | 300 | 600 | 1200;
+
+export const DPI_PRESETS: { value: DPIPreset; label: string }[] = [
+  { value: 150, label: '150 DPI' },
+  { value: 300, label: '300 DPI' },
+  { value: 600, label: '600 DPI' },
+  { value: 1200, label: '1200 DPI' },
+];
+
+// Scale presets
+export type ScalePreset = 0.5 | 1 | 2 | 3;
+
+export const SCALE_PRESETS: { value: ScalePreset; label: string }[] = [
+  { value: 0.5, label: '0.5x' },
+  { value: 1, label: '1x' },
+  { value: 2, label: '2x' },
+  { value: 3, label: '3x' },
+];
+
+// JPG quality presets
+export type JpgQualityPreset = 50 | 75 | 90 | 100;
+
+export const JPG_QUALITY_PRESETS: { value: JpgQualityPreset; label: string }[] = [
+  { value: 50, label: '50%' },
+  { value: 75, label: '75%' },
+  { value: 90, label: '90%' },
+  { value: 100, label: '100%' },
+];
+
+// Unit types for dimension input
+export type UnitType = 'pt' | 'px' | 'em' | 'rem' | 'cm' | 'mm' | 'in';
+
+export const UNIT_TYPES: { value: UnitType; label: string }[] = [
+  { value: 'pt', label: 'pt' },
+  { value: 'px', label: 'px' },
+  { value: 'em', label: 'em' },
+  { value: 'rem', label: 'rem' },
+  { value: 'cm', label: 'cm' },
+  { value: 'mm', label: 'mm' },
+  { value: 'in', label: 'in' },
+];
+
+// Conversion DPI presets for unit conversion
+export type ConversionDPIPreset = 72 | 96 | 150 | 300 | 600;
+
+export const CONVERSION_DPI_PRESETS: { value: ConversionDPIPreset; label: string }[] = [
+  { value: 72, label: '72 DPI' },
+  { value: 96, label: '96 DPI' },
+  { value: 150, label: '150 DPI' },
+  { value: 300, label: '300 DPI' },
+  { value: 600, label: '600 DPI' },
+];
+
 // Symbol palette data
 export type SymbolCategory = {
   name: string;
