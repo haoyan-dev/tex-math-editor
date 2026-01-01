@@ -1,6 +1,6 @@
 # LaTeX Math Equation Editor
 
-A self-hosted Next.js TypeScript web application for easily editing LaTeX math equations with live preview and server-side image export capabilities. Export equations to SVG format for further editing in vector design tools like Affinity Designer or Inkscape.
+A self-hosted Next.js TypeScript web application for easily editing LaTeX math equations with live preview and client-side image export capabilities. Export equations to SVG format for further editing in vector design tools like Affinity Designer or Inkscape.
 
 ## Project Overview
 
@@ -120,9 +120,6 @@ tex-math-editor/
 ├── app/
 │   ├── layout.tsx
 │   ├── page.tsx              # Main editor page
-│   ├── api/
-│   │   └── export/
-│   │       └── route.ts      # Export API endpoint
 │   └── globals.css
 ├── components/
 │   ├── EquationEditor.tsx
@@ -141,7 +138,7 @@ tex-math-editor/
 ├── README.md                 # Project documentation
 ├── package.json
 ├── tsconfig.json
-└── next.config.js
+└── next.config.ts
 ```
 
 ### Running in Development Mode
@@ -170,43 +167,6 @@ docker run -p 3000:3000 tex-math-editor
 docker-compose up -d        # Start in background
 docker-compose down         # Stop
 docker-compose logs -f      # View logs
-```
-
-## API Documentation
-
-### Export Endpoint
-
-**POST** `/api/export`
-
-Export a LaTeX equation as an image file or return SVG code.
-
-#### Request Body
-
-```json
-{
-  "equation": "string",          // LaTeX equation (required)
-  "format": "svg" | "png" | "jpg",  // Export format (default: "svg")
-  "font": "string",              // MathJax font name (optional, default: "TeX")
-  "width": number,               // Image width in pixels (optional)
-  "height": number,              // Image height in pixels (optional)
-  "returnCode": boolean,         // For SVG: return code instead of file (optional)
-  "svgFormat": "element" | "document"  // For SVG code: element or document format (optional)
-}
-```
-
-#### Response Formats
-
-- **SVG File**: Returns SVG file with `image/svg+xml` content type
-- **SVG Code**: Returns plain text with SVG code (when `returnCode: true`)
-- **PNG/JPG**: Returns image file with appropriate content type
-
-#### Error Handling
-
-Returns JSON error response with status code 400 or 500:
-```json
-{
-  "error": "Error message"
-}
 ```
 
 ## License
