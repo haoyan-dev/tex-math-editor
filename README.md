@@ -8,7 +8,11 @@ A self-hosted Next.js TypeScript web application for easily editing LaTeX math e
 
 **Primary Use Case**: Export equations as SVG for further editing in vector design tools (Affinity Designer, Inkscape)
 
-**Technology Stack**: Next.js, TypeScript, MathJax
+**Technology Stack**: 
+- Next.js 16.1.1 (React 19.2.3)
+- TypeScript 5.9.3
+- MathJax 4.0.0
+- Tailwind CSS 4.1.18
 
 **Deployment**: Self-hosted solution with Docker support for easy deployment
 
@@ -39,7 +43,13 @@ A self-hosted Next.js TypeScript web application for easily editing LaTeX math e
   - Custom dimensions: Specify exact width and/or height in pixels
   - PNG/JPG dimensions auto-populate at 3x SVG size for high-quality export
 
-- **Equation Examples**: Pre-built library of common mathematical equations organized by category (Algebra, Calculus, Linear Algebra, etc.) for quick insertion
+- **Equation Examples**: Pre-built library of common mathematical equations organized by 17 categories for quick insertion:
+  - Algebra, Calculus, Linear Algebra, Geometry
+  - Complex Analysis, Analysis, Number Theory
+  - Physics, Quantum Physics, Electromagnetism, Relativity, Fluid Dynamics
+  - PDEs (Partial Differential Equations)
+  - Probability, Statistics, Finance
+  - Inequalities
 
 - **Copy Functionality**: Copy full equation (with wrapper) or SVG code to clipboard
   - Visual confirmation modal shows copied content
@@ -48,7 +58,7 @@ A self-hosted Next.js TypeScript web application for easily editing LaTeX math e
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 20+ (tested with Node.js 20.19+) 
 - npm or yarn
 - Docker (optional, for containerized deployment)
 
@@ -95,7 +105,7 @@ The application will be available at [http://localhost:3000](http://localhost:30
 3. **Use Symbol Palette**: Click on symbols from the palette to insert them at your cursor position
    - Toggle symbol palette visibility with the "Show/Hide Symbol Palette" button
 4. **Use Equation Examples**: Click the floating examples button (top-right) to browse and insert pre-built equations
-   - Browse by category (Algebra, Calculus, Linear Algebra, etc.)
+   - Browse by 17 categories: Algebra, Calculus, Linear Algebra, Geometry, Complex Analysis, Analysis, Number Theory, Physics, Quantum Physics, Electromagnetism, Relativity, Fluid Dynamics, PDEs, Probability, Statistics, Finance, and Inequalities
    - Click any example to insert it into the editor
 5. **Live Preview**: See your equation rendered in real-time in the preview panel
 
