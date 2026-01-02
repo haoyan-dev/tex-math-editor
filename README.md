@@ -105,7 +105,7 @@ The application will be available at [http://localhost:3000](http://localhost:30
 3. **Use Symbol Palette**: Click on symbols from the palette to insert them at your cursor position
    - Toggle symbol palette visibility with the "Show/Hide Symbol Palette" button
 4. **Use Equation Examples**: Click the floating examples button (top-right) to browse and insert pre-built equations
-   - Browse by 17 categories: Algebra, Calculus, Linear Algebra, Geometry, Complex Analysis, Analysis, Number Theory, Physics, Quantum Physics, Electromagnetism, Relativity, Fluid Dynamics, PDEs, Probability, Statistics, Finance, Inequalities
+   - Browse by 17 categories: Algebra, Calculus, Linear Algebra, Geometry, Complex Analysis, Analysis, Number Theory, Physics, Quantum Physics, Electromagnetism, Relativity, Fluid Dynamics, PDEs, Probability, Statistics, Finance, and Inequalities
    - Click any example to insert it into the editor
 5. **Live Preview**: See your equation rendered in real-time in the preview panel
 
